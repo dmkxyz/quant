@@ -45,7 +45,12 @@ async function manualProfiles(
   req: Request,
   explicitUserId?: string
 ): Promise<ProfileRow[]> {
-  const userId = explicitUserId ?? (await authenticatedUserId(req));
+  const authenticatedId = await authenticatedUserId(req);
+  const serviceRole = hasServiceRole(req);
+  if (explicitUserId && !serviceRole && explicitUserId !== authenticatedId) {
+    throw new Error("Explicit user_id requires matching authenticated user");
+  }
+  const userId = explicitUserId ?? authenticatedId;
   if (!userId) throw new Error("Missing authenticated user");
 
   const { data, error } = await supabase
@@ -64,6 +69,21 @@ async function manualProfiles(
     .single();
   if (insertError) throw insertError;
   return [inserted as ProfileRow];
+}
+
+function hasServiceRole(req: Request): boolean {
+  const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  if (!token) return false;
+  const payload = token.split(".")[1];
+  if (!payload) return false;
+  try {
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    const decoded = JSON.parse(atob(padded)) as { role?: string };
+    return decoded.role === "service_role";
+  } catch {
+    return false;
+  }
 }
 
 async function authenticatedUserId(req: Request): Promise<string | undefined> {
