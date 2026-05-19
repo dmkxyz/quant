@@ -1,0 +1,26 @@
+node_modules/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+.cache/
+.DS_Store
+
+# Real environment files
+.env
+.env.*
+supabase/functions/.env
+supabase/functions/.env.*
+supabase/.temp/
+
+# Keep examples tracked
+!.env.example
+!.env.*.example
+!supabase/functions/.env.example
+!supabase/functions/.env.*.example
+
+# Local database artifacts
+*.db
+*.sqlite
+*.dump
