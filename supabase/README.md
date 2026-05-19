@@ -22,3 +22,15 @@ alter database postgres set app.quant_generate_week_key = '<service-role-or-invo
 ```
 
 The Edge Function itself remains idempotent through the `user_id + week_start_date` unique constraint and `generation_runs`.
+
+## Auth Settings
+
+For v1, hosted Auth should auto-confirm new email/password users because the app does not require email verification yet and the built-in Supabase mailer has a very low email-send quota. The deployed project is configured with:
+
+```text
+site_url=https://dmkxyz.github.io/quant/
+uri_allow_list=https://dmkxyz.github.io/quant/,http://localhost:5173/quant/,http://127.0.0.1:5173/quant/
+mailer_autoconfirm=true
+```
+
+If `mailer_autoconfirm` is false without a custom SMTP provider, signups can fail with `email rate limit exceeded`.
