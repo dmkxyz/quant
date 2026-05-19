@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const baseURL = process.env.E2E_BASE_URL ?? "http://127.0.0.1:5173/quant/";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 30_000,
@@ -7,15 +9,17 @@ export default defineConfig({
     timeout: 5_000
   },
   use: {
-    baseURL: "http://127.0.0.1:5173/quant/",
+    baseURL,
     trace: "retain-on-failure"
   },
-  webServer: {
-    command: "npm run dev -- --port 5173",
-    url: "http://127.0.0.1:5173/quant/",
-    reuseExistingServer: true,
-    timeout: 20_000
-  },
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : {
+        command: "npm run dev -- --port 5173",
+        url: "http://127.0.0.1:5173/quant/",
+        reuseExistingServer: true,
+        timeout: 20_000
+      },
   projects: [
     {
       name: "android-chrome",

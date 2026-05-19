@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("mobile test-auth flow solves a drill and reaches lessons/progress", async ({ page }, testInfo) => {
-  await page.goto("/?testAuth=1");
+  await page.goto("./?testAuth=1");
   await page.getByRole("button", { name: "Test auth" }).click();
 
   await expect(page.getByRole("heading", { name: "Quant" })).toBeVisible();
