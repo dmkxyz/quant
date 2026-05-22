@@ -17,6 +17,7 @@ describe("mocked Edge Function handlers", () => {
     );
     expect(result.source).toBe("llm");
     expect(result.weekPack.id).toBe(seed.id);
+    expect(result.weekPack.prepGuide.quickChecks).toHaveLength(3);
   });
 
   it("falls back when generate_week provider output is invalid", async () => {
@@ -26,6 +27,20 @@ describe("mocked Edge Function handlers", () => {
     );
     expect(result.source).toBe("fallback");
     expect(result.weekPack.weekdayProblems).toHaveLength(5);
+    expect(result.weekPack.prepGuide.sections.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("falls back when generate_week provider omits prep guide", async () => {
+    const invalid = createSeedWeekPack() as unknown as Record<string, unknown>;
+    delete invalid.prepGuide;
+
+    const result = await generateWeekWithProvider(
+      { userId: "user-1", targetWeekStartDate: "2026-05-18", difficulty: 1 },
+      async () => ({ ok: true, value: invalid as never })
+    );
+
+    expect(result.source).toBe("fallback");
+    expect(result.weekPack.prepGuide.dayCoverage.monday).toBeDefined();
   });
 
   it("falls back for coach, grade, and lesson providers", async () => {

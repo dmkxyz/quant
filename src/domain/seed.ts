@@ -1,5 +1,6 @@
 import type { DifficultyLabel, Problem, ProblemRubric, ProblemStage, WeekPack } from "./contracts";
 import { labelForDifficulty } from "./difficulty";
+import { createDefaultWeeklyPrepGuide } from "./prepGuide";
 import { isoDate, mondayForDate } from "./time";
 
 const rubric: ProblemRubric = {
@@ -189,6 +190,7 @@ export function createSeedWeekPack(
     weekStartDate,
     generatedAt: new Date().toISOString(),
     difficultyTarget,
+    prepGuide: createDefaultWeeklyPrepGuide([...weekdayProblems, weekendCapstone]),
     weekdayProblems,
     weekendCapstone,
     conceptMap,

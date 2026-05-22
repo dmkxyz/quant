@@ -1,4 +1,4 @@
-import { CheckCircle2, LockKeyhole, PlayCircle } from "lucide-react";
+import { BookOpen, CheckCircle2, LockKeyhole, PlayCircle } from "lucide-react";
 import clsx from "clsx";
 import type { TrainingController } from "../hooks/useTrainingData";
 import { ConceptChip } from "../components/ConceptChip";
@@ -23,6 +23,26 @@ export function WeekScreen({ training }: { training: TrainingController }) {
       </div>
 
       <div className="week-list">
+        <article className="week-row prep-week-row">
+          <div className="day-badge">
+            <BookOpen size={18} />
+          </div>
+          <div className="week-row-main">
+            <div className="week-row-title">
+              <h3>{training.weekPack.prepGuide.title}</h3>
+              <span>{training.weekPack.prepGuide.estimatedMinutes} min</span>
+            </div>
+            <div className="concept-row">
+              {training.weekPack.prepGuide.prerequisiteConcepts.slice(0, 6).map((concept) => (
+                <ConceptChip key={concept} label={concept} />
+              ))}
+            </div>
+          </div>
+          <div className="week-state">
+            {training.currentPrepProgress.viewedAt ? <CheckCircle2 size={19} /> : <BookOpen size={18} />}
+            <span>{training.currentPrepProgress.viewedAt ? "viewed" : "prep"}</span>
+          </div>
+        </article>
         {problems.map((problem, index) => {
           const attempt = training.attempts[problem.id];
           const score = attempt ? training.scores[attempt.id] : undefined;

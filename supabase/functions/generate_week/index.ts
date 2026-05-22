@@ -119,8 +119,8 @@ async function generateForProfile(
     jsonSchema: weekPackJsonSchema,
     validate: validateWeekPack,
     system:
-      "You generate original quant trading interview practice. Return JSON only. Do not copy proprietary interview questions. Keep problems self-contained and solvable with probability, expected value, estimation, and clear reasoning.",
-    user: `Create one WeekPack for user ${profile.user_id}, weekStartDate ${targetWeekStartDate}, difficulty ${difficulty}. Include Monday-Friday drills under 20 minutes and one Saturday/Sunday capstone between 90 and 120 minutes. Use graduated hints and concise user-facing rationale.`
+      "You generate original quant trading interview practice. Return JSON only. Do not copy proprietary interview questions. Keep problems self-contained and solvable with probability, expected value, estimation, and clear reasoning. Every WeekPack must include a self-contained prepGuide that teaches prerequisite ideas before the drills. Do not use external reading links. Do not assume the user already knows terms like expected value, fair value, state space, bid/ask, volume, or shares traded.",
+    user: `Create one WeekPack for user ${profile.user_id}, weekStartDate ${targetWeekStartDate}, difficulty ${difficulty}. Include Monday-Friday drills under 20 minutes and one Saturday/Sunday capstone between 90 and 120 minutes. Use graduated hints and concise user-facing rationale. Also include a prepGuide with primers, worked examples, dialogue-style tutor/student explanations, quick checks with answers and explanations, and dayCoverage keyed by problem day so each generated problem day maps to relevant prep section IDs.`
   });
 
   const weekPack =

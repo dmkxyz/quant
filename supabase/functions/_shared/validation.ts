@@ -2,6 +2,42 @@ import { z } from "https://esm.sh/zod@4.4.3";
 
 const nonEmptyString = z.string().trim().min(1);
 
+export const prepDialogueTurnSchema = z.object({
+  speaker: z.enum(["tutor", "student"]),
+  text: nonEmptyString
+});
+
+export const prepGuideSectionSchema = z.object({
+  id: nonEmptyString,
+  title: nonEmptyString,
+  kind: z.enum(["primer", "worked_example", "dialogue"]),
+  concepts: z.array(nonEmptyString).min(1),
+  body: nonEmptyString,
+  example: z.string().optional(),
+  dialogueTurns: z.array(prepDialogueTurnSchema).optional()
+});
+
+export const prepQuickCheckSchema = z.object({
+  id: nonEmptyString,
+  prompt: nonEmptyString,
+  answer: nonEmptyString,
+  explanation: nonEmptyString,
+  relatedConcepts: z.array(nonEmptyString).min(1)
+});
+
+export const prepGuideSchema = z.object({
+  title: nonEmptyString,
+  estimatedMinutes: z.number().int().positive(),
+  prerequisiteConcepts: z.array(nonEmptyString).min(3),
+  learningObjectives: z.array(nonEmptyString).min(1),
+  sections: z.array(prepGuideSectionSchema).min(3),
+  quickChecks: z.array(prepQuickCheckSchema).min(3),
+  dayCoverage: z.partialRecord(
+    z.enum(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]),
+    z.array(nonEmptyString).min(1)
+  )
+});
+
 export const problemStageSchema = z.object({
   id: nonEmptyString,
   title: nonEmptyString,
@@ -42,6 +78,7 @@ export const weekPackSchema = z.object({
   weekStartDate: nonEmptyString,
   generatedAt: nonEmptyString,
   difficultyTarget: z.number().min(0.5).max(5),
+  prepGuide: prepGuideSchema,
   weekdayProblems: z.array(problemSchema),
   weekendCapstone: problemSchema,
   conceptMap: z.record(z.string(), z.array(nonEmptyString)),
@@ -85,7 +122,16 @@ export type LessonBite = z.infer<typeof lessonBiteSchema>;
 export function validateWeekPack(payload: unknown): { success: boolean; data?: WeekPack; errors: string[] } {
   const parsed = weekPackSchema.safeParse(payload);
   if (!parsed.success) {
-    return { success: false, errors: parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`) };
+    return {
+      success: false,
+      errors: parsed.error.issues.map((issue) => {
+        const path = issue.path.join(".");
+        if (issue.path[0] === "prepGuide") {
+          return `${path || "prepGuide"}: prep guide is required and must include complete sections, quick checks, and day coverage.`;
+        }
+        return `${path}: ${issue.message}`;
+      })
+    };
   }
   const data = parsed.data;
   const errors: string[] = [];
@@ -104,6 +150,7 @@ export function validateWeekPack(payload: unknown): { success: boolean; data?: W
     errors.push("Weekend estimatedMinutes must be between 90 and 120.");
   }
   validateStages(data.weekendCapstone, errors);
+  validatePrepGuide(data, errors);
   return errors.length ? { success: false, errors } : { success: true, data, errors: [] };
 }
 
@@ -133,6 +180,23 @@ function validateStages(problem: Problem, errors: string[]) {
   }
 }
 
+function validatePrepGuide(data: WeekPack, errors: string[]) {
+  const sectionIds = new Set(data.prepGuide.sections.map((section) => section.id));
+  const generatedDays = [...data.weekdayProblems, data.weekendCapstone].map((problem) => problem.day);
+  for (const day of generatedDays) {
+    const coveredSectionIds = data.prepGuide.dayCoverage[day];
+    if (!coveredSectionIds?.length) {
+      errors.push(`prep coverage must include ${day}.`);
+      continue;
+    }
+    for (const sectionId of coveredSectionIds) {
+      if (!sectionIds.has(sectionId)) {
+        errors.push(`${day} references missing prep section ${sectionId}.`);
+      }
+    }
+  }
+}
+
 export const weekPackJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -142,6 +206,7 @@ export const weekPackJsonSchema = {
     "weekStartDate",
     "generatedAt",
     "difficultyTarget",
+    "prepGuide",
     "weekdayProblems",
     "weekendCapstone",
     "conceptMap",
@@ -153,12 +218,82 @@ export const weekPackJsonSchema = {
     weekStartDate: { type: "string" },
     generatedAt: { type: "string" },
     difficultyTarget: { type: "number", minimum: 0.5, maximum: 5 },
+    prepGuide: { $ref: "#/$defs/prepGuide" },
     weekdayProblems: { type: "array", minItems: 5, maxItems: 5, items: { $ref: "#/$defs/problem" } },
     weekendCapstone: { $ref: "#/$defs/problem" },
     conceptMap: { type: "object", additionalProperties: { type: "array", items: { type: "string" } } },
     generationRationale: { type: "string" }
   },
   $defs: {
+    prepDialogueTurn: {
+      type: "object",
+      additionalProperties: false,
+      required: ["speaker", "text"],
+      properties: {
+        speaker: { enum: ["tutor", "student"] },
+        text: { type: "string" }
+      }
+    },
+    prepSection: {
+      type: "object",
+      additionalProperties: false,
+      required: ["id", "title", "kind", "concepts", "body"],
+      properties: {
+        id: { type: "string" },
+        title: { type: "string" },
+        kind: { enum: ["primer", "worked_example", "dialogue"] },
+        concepts: { type: "array", minItems: 1, items: { type: "string" } },
+        body: { type: "string" },
+        example: { type: "string" },
+        dialogueTurns: { type: "array", items: { $ref: "#/$defs/prepDialogueTurn" } }
+      }
+    },
+    prepQuickCheck: {
+      type: "object",
+      additionalProperties: false,
+      required: ["id", "prompt", "answer", "explanation", "relatedConcepts"],
+      properties: {
+        id: { type: "string" },
+        prompt: { type: "string" },
+        answer: { type: "string" },
+        explanation: { type: "string" },
+        relatedConcepts: { type: "array", minItems: 1, items: { type: "string" } }
+      }
+    },
+    prepGuide: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "title",
+        "estimatedMinutes",
+        "prerequisiteConcepts",
+        "learningObjectives",
+        "sections",
+        "quickChecks",
+        "dayCoverage"
+      ],
+      properties: {
+        title: { type: "string" },
+        estimatedMinutes: { type: "integer", minimum: 1 },
+        prerequisiteConcepts: { type: "array", minItems: 3, items: { type: "string" } },
+        learningObjectives: { type: "array", minItems: 1, items: { type: "string" } },
+        sections: { type: "array", minItems: 3, items: { $ref: "#/$defs/prepSection" } },
+        quickChecks: { type: "array", minItems: 3, items: { $ref: "#/$defs/prepQuickCheck" } },
+        dayCoverage: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            monday: { type: "array", minItems: 1, items: { type: "string" } },
+            tuesday: { type: "array", minItems: 1, items: { type: "string" } },
+            wednesday: { type: "array", minItems: 1, items: { type: "string" } },
+            thursday: { type: "array", minItems: 1, items: { type: "string" } },
+            friday: { type: "array", minItems: 1, items: { type: "string" } },
+            saturday: { type: "array", minItems: 1, items: { type: "string" } },
+            sunday: { type: "array", minItems: 1, items: { type: "string" } }
+          }
+        }
+      }
+    },
     stage: {
       type: "object",
       additionalProperties: false,

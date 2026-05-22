@@ -7,6 +7,40 @@ describe("WeekPack validation", () => {
     const result = validateWeekPack(createSeedWeekPack());
     expect(result.success).toBe(true);
     expect(result.errors).toEqual([]);
+    expect(result.data?.prepGuide.sections.length).toBeGreaterThanOrEqual(3);
+    expect(result.data?.prepGuide.quickChecks.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("rejects missing prep guide content", () => {
+    const pack = createSeedWeekPack() as unknown as Record<string, unknown>;
+    delete pack.prepGuide;
+    const result = validateWeekPack(pack);
+    expect(result.success).toBe(false);
+    expect(result.errors.join(" ")).toContain("prep guide");
+  });
+
+  it("rejects incomplete prep quick checks", () => {
+    const pack = createSeedWeekPack();
+    pack.prepGuide.quickChecks[0].answer = "";
+    const result = validateWeekPack(pack);
+    expect(result.success).toBe(false);
+    expect(result.errors.join(" ")).toContain("quick check");
+  });
+
+  it("rejects prep day coverage that omits generated problem days", () => {
+    const pack = createSeedWeekPack();
+    delete pack.prepGuide.dayCoverage.monday;
+    const result = validateWeekPack(pack);
+    expect(result.success).toBe(false);
+    expect(result.errors.join(" ")).toContain("prep coverage");
+  });
+
+  it("rejects prep day coverage that references missing sections", () => {
+    const pack = createSeedWeekPack();
+    pack.prepGuide.dayCoverage.monday = ["missing-section"];
+    const result = validateWeekPack(pack);
+    expect(result.success).toBe(false);
+    expect(result.errors.join(" ")).toContain("missing prep section");
   });
 
   it("rejects missing weekday drills", () => {

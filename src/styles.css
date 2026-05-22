@@ -328,13 +328,15 @@ textarea:focus {
 .solver-main,
 .filter-panel,
 .chart-panel,
-.trend-panel {
+.trend-panel,
+.prep-panel {
   padding: 1rem;
 }
 
 .problem-kicker,
 .stage-heading,
 .week-row-title,
+.prep-header,
 .lesson-title,
 .settings-row {
   display: flex;
@@ -346,6 +348,96 @@ textarea:focus {
 .problem-prompt {
   color: #b8dec9;
   line-height: 1.55;
+}
+
+.prep-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.prep-header h2 {
+  margin: 0.15rem 0 0;
+  color: #ecfff5;
+  font-size: clamp(1.15rem, 3.5vw, 1.55rem);
+}
+
+.prep-header span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.prep-meta,
+.prep-objectives,
+.prep-section-list,
+.quick-check-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.prep-objectives {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.prep-objectives p,
+.prep-section p,
+.quick-check p {
+  margin: 0;
+  color: #c8efd9;
+  line-height: 1.5;
+}
+
+.prep-section {
+  display: grid;
+  gap: 0.55rem;
+  border-top: 1px solid rgba(0, 255, 136, 0.12);
+  padding-top: 0.85rem;
+}
+
+.prep-example,
+.prep-answer {
+  color: #eafff3 !important;
+}
+
+.dialogue-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.dialogue-list p {
+  border-left: 2px solid var(--line);
+  padding-left: 0.65rem;
+}
+
+.dialogue-list p.student {
+  border-left-color: var(--cyan);
+}
+
+.dialogue-list strong {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.quick-check {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 0.75rem;
+  border-top: 1px solid rgba(0, 255, 136, 0.12);
+  padding-top: 0.85rem;
+}
+
+.quick-check > svg {
+  color: var(--cyan);
+  margin-top: 0.15rem;
+}
+
+.quick-check strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #eafff3;
 }
 
 .concept-row {
