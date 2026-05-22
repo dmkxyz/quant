@@ -6,7 +6,8 @@ Quant is a mobile-first progressive web app for daily Jane Street-style quantita
 
 - Six app screens: Today, Week, Weekend, Lessons, Progress, and Settings.
 - Android-friendly PWA manifest, service worker, installable app shell, and local offline cache for generated problems, attempts, lessons, and progress summaries.
-- Supabase schema with RLS for per-user ownership across profiles, WeekPacks, problems, attempts, scores, lessons, progress snapshots, and generation runs.
+- Self-contained weekly prep guides generated with each WeekPack, shown before drills and revisitable from Week and Lessons.
+- Supabase schema with RLS for per-user ownership across profiles, WeekPacks, problems, attempts, scores, lessons, prep progress, progress snapshots, and generation runs.
 - Supabase Edge Functions for `generate_week`, `coach_turn`, `grade_attempt`, `summarize_lesson`, and `refresh_progress_metrics`.
 - OpenRouter calls only run inside Edge Functions. Browser code never reads `OPENROUTER_API_KEY`, service-role keys, or deployment secrets.
 - Deterministic fallback WeekPack, coach, grading, and lesson behavior when OpenRouter is unavailable or invalid after one retry.

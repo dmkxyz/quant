@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "./useAuth";
-import type { Attempt, AttemptScore, LessonBite, Problem, ProblemDay, WeekPack, WeeklyMetrics } from "../domain/contracts";
+import type {
+  Attempt,
+  AttemptScore,
+  LessonBite,
+  PrepGuideProgress,
+  Problem,
+  ProblemDay,
+  WeekPack,
+  WeeklyMetrics
+} from "../domain/contracts";
 import { createAttempt, recordStageAnswer, requestHint, submitAttempt } from "../domain/attempts";
 import { calculateNextDifficulty } from "../domain/difficulty";
+import { ensureWeekPackPrepGuide } from "../domain/prepGuide";
+import { createInitialPrepProgress, markPrepGuideViewed as markProgressViewed, markPrepQuickCheckComplete } from "../domain/prepProgress";
 import { computeWeeklyMetrics, createLessonFromScore, scoreAttemptLocally } from "../domain/scoring";
 import { createSeedWeekPack } from "../domain/seed";
 import { browserTimezone, isoDate, mondayForDate, nextMondayAfter } from "../domain/time";
@@ -22,6 +33,7 @@ interface TrainingState {
   attempts: Record<string, Attempt>;
   scores: Record<string, AttemptScore>;
   lessons: LessonBite[];
+  prepProgressByWeek: Record<string, PrepGuideProgress>;
   providerMessage: string;
   pendingSync: boolean;
   updatedAt: string;
@@ -30,6 +42,7 @@ interface TrainingState {
 export interface TrainingController extends TrainingState {
   allProblems: Problem[];
   metrics: WeeklyMetrics;
+  currentPrepProgress: PrepGuideProgress;
   online: boolean;
   loading: boolean;
   getProblemForDay: (day: ProblemDay) => Problem;
@@ -37,6 +50,8 @@ export interface TrainingController extends TrainingState {
   requestHintForStage: (problem: Problem, stageId: string) => Promise<string>;
   recordAnswerForStage: (problem: Problem, stageId: string, answer: string, coachMessage?: string) => void;
   submitProblem: (problem: Problem, finalAnswer: string, confidence: 1 | 2 | 3 | 4 | 5, elapsedSeconds: number) => Promise<void>;
+  markPrepGuideViewed: () => void;
+  markPrepQuickCheckComplete: (checkId: string) => void;
   generateNextWeek: () => Promise<void>;
   resetCache: () => void;
   updateTimezone: (timezone: string) => Promise<void>;
@@ -71,7 +86,7 @@ export function useTrainingData(user: AuthUser | null): TrainingController | nul
 
     setLoading(true);
     const cached = loadJson<TrainingState>(cacheKey);
-    const initial = cached ?? createInitialState(user);
+    const initial = normalizeTrainingState(cached ?? createInitialState(user));
     setState(initial);
     saveJson(cacheKey, initial);
     setLoading(false);
@@ -106,6 +121,14 @@ export function useTrainingData(user: AuthUser | null): TrainingController | nul
             masteredConcepts: []
           },
     [allProblems, state]
+  );
+
+  const currentPrepProgress = useMemo(
+    () =>
+      state
+        ? state.prepProgressByWeek[state.weekPack.id] ?? createInitialPrepProgress(state.weekPack.id)
+        : createInitialPrepProgress(""),
+    [state]
   );
 
   const persist = useCallback(
@@ -235,6 +258,33 @@ export function useTrainingData(user: AuthUser | null): TrainingController | nul
     [online, persist, state, user]
   );
 
+  const markPrepGuideViewed = useCallback(() => {
+    if (!state || !user) return;
+    const current = state.prepProgressByWeek[state.weekPack.id] ?? createInitialPrepProgress(state.weekPack.id);
+    const next = markProgressViewed(current);
+    persist((trainingState) => ({
+      ...trainingState,
+      prepProgressByWeek: { ...trainingState.prepProgressByWeek, [trainingState.weekPack.id]: next },
+      pendingSync: !online
+    }));
+    void syncPrepProgress(user, next, online);
+  }, [online, persist, state, user]);
+
+  const completePrepQuickCheck = useCallback(
+    (checkId: string) => {
+      if (!state || !user) return;
+      const current = state.prepProgressByWeek[state.weekPack.id] ?? createInitialPrepProgress(state.weekPack.id);
+      const next = markPrepQuickCheckComplete(current, checkId);
+      persist((trainingState) => ({
+        ...trainingState,
+        prepProgressByWeek: { ...trainingState.prepProgressByWeek, [trainingState.weekPack.id]: next },
+        pendingSync: !online
+      }));
+      void syncPrepProgress(user, next, online);
+    },
+    [online, persist, state, user]
+  );
+
   const generateNextWeek = useCallback(async () => {
     if (!state || !user) return;
     const nextWeekStart = isoDate(nextMondayAfter(new Date()));
@@ -263,6 +313,10 @@ export function useTrainingData(user: AuthUser | null): TrainingController | nul
       weekPack: nextWeek,
       attempts: {},
       scores: {},
+      prepProgressByWeek: {
+        ...current.prepProgressByWeek,
+        [nextWeek.id]: current.prepProgressByWeek[nextWeek.id] ?? createInitialPrepProgress(nextWeek.id)
+      },
       providerMessage: "Generated deterministic local WeekPack"
     }));
   }, [cacheKey, metrics, online, persist, state, user]);
@@ -290,6 +344,7 @@ export function useTrainingData(user: AuthUser | null): TrainingController | nul
     ...state,
     allProblems,
     metrics,
+    currentPrepProgress,
     online,
     loading,
     getProblemForDay,
@@ -297,6 +352,8 @@ export function useTrainingData(user: AuthUser | null): TrainingController | nul
     requestHintForStage,
     recordAnswerForStage,
     submitProblem,
+    markPrepGuideViewed,
+    markPrepQuickCheckComplete: completePrepQuickCheck,
     generateNextWeek,
     resetCache,
     updateTimezone
@@ -331,6 +388,9 @@ function createInitialState(user: AuthUser): TrainingState {
         updatedAt: new Date().toISOString()
       }
     ],
+    prepProgressByWeek: {
+      [weekPack.id]: createInitialPrepProgress(weekPack.id)
+    },
     providerMessage: providerStatusLabel(),
     pendingSync: false,
     updatedAt: new Date().toISOString()
@@ -368,17 +428,26 @@ async function hydrateRemote(user: AuthUser, cacheKey: string): Promise<Training
   const problems = problemRows.map(remoteProblemToDomain).sort((a, b) => dayOrder(a.day) - dayOrder(b.day));
   const weekdayProblems = problems.filter((problem) => problem.kind === "weekday_drill");
   const weekendCapstone = problems.find((problem) => problem.kind === "weekend_capstone") ?? weekdayProblems[0];
-  const weekPack: WeekPack = {
+  const rawPayload = week.raw_payload as { prepGuide?: WeekPack["prepGuide"] } | null;
+  const weekPack = ensureWeekPackPrepGuide({
     id: week.id,
     userId: user.id,
     weekStartDate: week.week_start_date,
     generatedAt: week.generated_at,
     difficultyTarget: Number(week.difficulty_target),
+    prepGuide: rawPayload?.prepGuide,
     weekdayProblems,
     weekendCapstone,
     conceptMap: buildConceptMap(problems),
     generationRationale: week.generation_rationale
-  };
+  });
+
+  const { data: prepProgressRow } = await supabase
+    .from("week_prep_progress")
+    .select("*")
+    .eq("week_pack_id", week.id)
+    .eq("user_id", user.id)
+    .maybeSingle();
 
   return {
     profile: {
@@ -391,9 +460,25 @@ async function hydrateRemote(user: AuthUser, cacheKey: string): Promise<Training
     attempts: {},
     scores: {},
     lessons: [],
+    prepProgressByWeek: {
+      [weekPack.id]: remotePrepProgressToDomain(prepProgressRow, weekPack.id)
+    },
     providerMessage: "Loaded hosted Supabase WeekPack",
     pendingSync: false,
     updatedAt: new Date().toISOString()
+  };
+}
+
+function normalizeTrainingState(state: TrainingState): TrainingState {
+  const weekPack = ensureWeekPackPrepGuide(state.weekPack);
+  const prepProgressByWeek = state.prepProgressByWeek ?? {};
+  return {
+    ...state,
+    weekPack,
+    prepProgressByWeek: {
+      ...prepProgressByWeek,
+      [weekPack.id]: prepProgressByWeek[weekPack.id] ?? createInitialPrepProgress(weekPack.id)
+    }
   };
 }
 
@@ -430,6 +515,19 @@ async function syncAttempt(user: AuthUser, problem: Problem, attempt: Attempt, o
   }
 }
 
+async function syncPrepProgress(user: AuthUser, progress: PrepGuideProgress, online: boolean) {
+  if (!canUseRemote(user, online) || !isUuid(progress.weekPackId)) return;
+  await supabase!.from("week_prep_progress").upsert(
+    {
+      user_id: user.id,
+      week_pack_id: progress.weekPackId,
+      viewed_at: progress.viewedAt ?? null,
+      completed_check_ids: progress.completedCheckIds
+    },
+    { onConflict: "user_id,week_pack_id" }
+  );
+}
+
 function canUseRemote(user: AuthUser | null, online: boolean): boolean {
   return Boolean(user && !user.isTestMode && online && isSupabaseConfigured && supabase);
 }
@@ -448,6 +546,11 @@ interface RemoteProblemRow {
   expected_reasoning: string[];
   rubric: Problem["rubric"];
   estimated_minutes: number;
+}
+
+interface RemotePrepProgressRow {
+  viewed_at?: string | null;
+  completed_check_ids?: unknown;
 }
 
 function remoteProblemToDomain(row: RemoteProblemRow): Problem {
@@ -473,6 +576,16 @@ function buildConceptMap(problems: Problem[]): Record<string, string[]> {
     for (const concept of problem.concepts) acc[concept] = [...(acc[concept] ?? []), problem.id];
     return acc;
   }, {});
+}
+
+function remotePrepProgressToDomain(row: RemotePrepProgressRow | null, weekPackId: string): PrepGuideProgress {
+  return {
+    weekPackId,
+    viewedAt: row?.viewed_at ?? undefined,
+    completedCheckIds: Array.isArray(row?.completed_check_ids)
+      ? row.completed_check_ids.filter((item): item is string => typeof item === "string")
+      : []
+  };
 }
 
 function dayOrder(day: ProblemDay): number {

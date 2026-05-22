@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { LessonMasteryStatus } from "../domain/contracts";
 import type { TrainingController } from "../hooks/useTrainingData";
 import { ConceptChip } from "../components/ConceptChip";
+import { PrepGuidePanel } from "../components/PrepGuidePanel";
 
 const filters: Array<LessonMasteryStatus | "all"> = ["all", "new", "weak", "practicing", "mastered"];
 
@@ -29,6 +30,13 @@ export function LessonsScreen({ training }: { training: TrainingController }) {
         <span>lesson bites</span>
         <h2>Revisit weak concepts</h2>
       </div>
+
+      <PrepGuidePanel
+        guide={training.weekPack.prepGuide}
+        progress={training.currentPrepProgress}
+        onViewed={training.markPrepGuideViewed}
+        onCompleteCheck={training.markPrepQuickCheckComplete}
+      />
 
       <div className="filter-panel panel">
         <div className="search-box">

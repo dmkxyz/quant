@@ -10,6 +10,46 @@ export type ProblemDay =
 export type DifficultyLabel = "beginner" | "developing" | "intermediate" | "advanced" | "expert";
 export type ExpectedUserAction = "estimate" | "calculate" | "explain" | "compare" | "decide" | "reflect";
 export type LessonMasteryStatus = "new" | "weak" | "practicing" | "mastered";
+export type PrepSectionKind = "primer" | "worked_example" | "dialogue";
+
+export interface PrepDialogueTurn {
+  speaker: "tutor" | "student";
+  text: string;
+}
+
+export interface PrepGuideSection {
+  id: string;
+  title: string;
+  kind: PrepSectionKind;
+  concepts: string[];
+  body: string;
+  example?: string;
+  dialogueTurns?: PrepDialogueTurn[];
+}
+
+export interface PrepQuickCheck {
+  id: string;
+  prompt: string;
+  answer: string;
+  explanation: string;
+  relatedConcepts: string[];
+}
+
+export interface WeeklyPrepGuide {
+  title: string;
+  estimatedMinutes: number;
+  prerequisiteConcepts: string[];
+  learningObjectives: string[];
+  sections: PrepGuideSection[];
+  quickChecks: PrepQuickCheck[];
+  dayCoverage: Partial<Record<ProblemDay, string[]>>;
+}
+
+export interface PrepGuideProgress {
+  weekPackId: string;
+  viewedAt?: string;
+  completedCheckIds: string[];
+}
 
 export interface ProblemStage {
   id: string;
@@ -51,6 +91,7 @@ export interface WeekPack {
   weekStartDate: string;
   generatedAt: string;
   difficultyTarget: number;
+  prepGuide: WeeklyPrepGuide;
   weekdayProblems: Problem[];
   weekendCapstone: Problem;
   conceptMap: Record<string, string[]>;

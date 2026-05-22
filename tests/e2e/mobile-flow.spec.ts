@@ -5,7 +5,8 @@ test("mobile test-auth flow solves a drill and reaches lessons/progress", async 
   await page.getByRole("button", { name: "Test auth" }).click();
 
   await expect(page.getByRole("heading", { name: "Quant" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Conditional Dice Update" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Foundations for this week" })).toBeVisible();
+  await page.getByRole("button", { name: "Begin drill" }).click();
   await page.screenshot({ path: `test-results/screenshots/${testInfo.project.name}-today.png`, fullPage: false });
 
   await page.getByPlaceholder("Write the next reasoning step...").fill("I anchor on equally likely dice states before conditioning.");
@@ -24,7 +25,7 @@ test("mobile test-auth flow solves a drill and reaches lessons/progress", async 
 
   await page.getByRole("button", { name: "Lessons" }).click();
   await expect(page.getByRole("heading", { name: "Revisit weak concepts" })).toBeVisible();
-  await expect(page.getByText("Revisit Conditional Dice Update")).toBeVisible();
+  await expect(page.getByText(/Revisit .+:/)).toBeVisible();
 
   await page.getByRole("button", { name: "Progress" }).click();
   await expect(page.getByRole("heading", { name: "Signal dashboard" })).toBeVisible();
